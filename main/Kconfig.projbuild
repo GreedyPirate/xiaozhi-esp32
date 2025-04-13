@@ -58,6 +58,8 @@ choice BOARD_TYPE
         bool "面包板新版接线（WiFi）"
     config BOARD_TYPE_BREAD_COMPACT_WIFI_LCD
         bool "面包板新版接线（WiFi）+ LCD"
+    config YOMI_V1_BOARD
+        bool "Yomi V1版本"
     config BOARD_TYPE_BREAD_COMPACT_ML307
         bool "面包板新版接线（ML307 AT）"
     config BOARD_TYPE_BREAD_COMPACT_ESP32
@@ -173,11 +175,13 @@ choice DISPLAY_OLED_TYPE
 endchoice
 
 choice DISPLAY_LCD_TYPE
-    depends on BOARD_TYPE_BREAD_COMPACT_WIFI_LCD || BOARD_TYPE_BREAD_COMPACT_ESP32_LCD || BOARD_TYPE_ESP32_CGC
+    depends on BOARD_TYPE_BREAD_COMPACT_WIFI_LCD || BOARD_TYPE_BREAD_COMPACT_ESP32_LCD || BOARD_TYPE_ESP32_CGC || YOMI_V1_BOARD
     prompt "LCD Type"
     default LCD_ST7789_240X320
     help
         屏幕类型选择
+    config LCD_ST77916_360X360
+        bool "ST77916, 分辨率360*360, 圆屏"
     config LCD_ST7789_240X320
         bool "ST7789, 分辨率240*320, IPS"
     config LCD_ST7789_240X320_NO_IPS

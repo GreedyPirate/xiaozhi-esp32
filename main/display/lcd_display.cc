@@ -1,6 +1,8 @@
 #include "lcd_display.h"
 
 #include <vector>
+#include <unordered_map>
+#include <string>
 #include <font_awesome_symbols.h>
 #include <esp_log.h>
 #include <esp_err.h>
@@ -34,6 +36,59 @@
 #define LIGHT_SYSTEM_TEXT_COLOR      lv_color_hex(0x666666)     // Dark gray text
 #define LIGHT_BORDER_COLOR           lv_color_hex(0xE0E0E0)     // Light gray border
 #define LIGHT_LOW_BATTERY_COLOR      lv_color_black()           // Black for light mode
+
+
+extern "C" {
+    extern const lv_image_dsc_t neutral;
+    extern const lv_image_dsc_t angry;
+    extern const lv_image_dsc_t confused;
+    extern const lv_image_dsc_t cool;
+    extern const lv_image_dsc_t crying;
+    extern const lv_image_dsc_t kissy;
+    extern const lv_image_dsc_t loving;
+    extern const lv_image_dsc_t laughing;
+    extern const lv_image_dsc_t sad;
+    extern const lv_image_dsc_t shocked;
+    extern const lv_image_dsc_t sleepy;
+    extern const lv_image_dsc_t thinking;
+    extern const lv_image_dsc_t winking;
+}
+
+LV_IMG_DECLARE(neutral);
+LV_IMG_DECLARE(angry);
+LV_IMG_DECLARE(confused);
+LV_IMG_DECLARE(cool);
+LV_IMG_DECLARE(crying);
+LV_IMG_DECLARE(kissy);
+LV_IMG_DECLARE(loving);
+LV_IMG_DECLARE(laughing);
+LV_IMG_DECLARE(sad);
+LV_IMG_DECLARE(shocked);
+LV_IMG_DECLARE(sleepy);
+LV_IMG_DECLARE(thinking);
+LV_IMG_DECLARE(winking);
+
+typedef std::unordered_map<std::string, const lv_img_dsc_t*> EmotionMap;
+
+// 初始化静态 map
+static const EmotionMap emotions = {
+    {"neutral", &neutral},
+    {"happy", &laughing},
+    {"laughing", &laughing},
+    {"funny", &laughing},
+    {"sad", &sad},
+    {"angry", &angry},
+    {"crying", &crying},
+    {"loving", &loving},
+    {"embarrassed", &cool},
+    {"surprised", &cool},
+    {"shocked", &cool},
+    {"thinking", &thinking},
+    {"winking", &winking},
+    {"cool", &cool},
+    {"kissy", &kissy},
+    {"sleepy", &sleepy}
+};
 
 // Theme color structure
 struct ThemeColors {
@@ -79,6 +134,100 @@ static ThemeColors current_theme = LIGHT_THEME;
 
 
 LV_FONT_DECLARE(font_awesome_30_4);
+
+QspiLcdDisplay::QspiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel,
+    int width, int height, int offset_x, int offset_y, bool mirror_x, bool mirror_y, bool swap_xy,
+    DisplayFonts fonts)
+: LcdDisplay(panel_io, panel, fonts) {
+
+    width_ = width;
+    height_ = height;
+
+    std::vector<uint16_t> buffer(width_, 0xFFFF);
+    for (int y = 0; y < height_; y++) {
+        esp_lcd_panel_draw_bitmap(panel, 0, y, width_, y + 1, buffer.data());
+    }
+
+    // Set the display to on
+    ESP_LOGI(TAG, "Turning display on");
+    ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel, true));
+
+    ESP_LOGI(TAG, "Initialize LVGL library");
+    lv_init();
+
+    ESP_LOGI(TAG, "Initialize LVGL port");
+    const lvgl_port_cfg_t port_cfg = {
+        .task_priority = 4,         /* LVGL task priority */
+        .task_stack = 4096,         /* LVGL task stack size */
+        .task_affinity = -1,        /* LVGL task pinned to core (-1 is no affinity) */
+        .task_max_sleep_ms = 500,   /* Maximum sleep in LVGL task */
+        .timer_period_ms = 5        /* LVGL timer tick period in ms */
+    };
+    lvgl_port_init(&port_cfg);
+
+    ESP_LOGI(TAG, "Adding LCD screen");
+    const lvgl_port_display_cfg_t display_cfg = {
+        .io_handle = panel_io,
+        .panel_handle = panel,
+        .control_handle = nullptr,
+        .buffer_size = static_cast<uint32_t>(width_ * height_ / 10),
+        .double_buffer = 0,
+        .trans_size = 512,
+        .hres = static_cast<uint32_t>(width_),
+        .vres = static_cast<uint32_t>(height_),
+        .monochrome = false,
+        .rotation = {
+            .swap_xy = false,
+            .mirror_x = false,
+            .mirror_y = false,
+        },
+        .color_format = LV_COLOR_FORMAT_RGB565,
+        .flags = {
+            .buff_dma = 1,
+            .swap_bytes = 1,
+        },
+    };
+
+    display_ = lvgl_port_add_disp(&display_cfg);
+    if (display_ == nullptr) {
+        ESP_LOGE(TAG, "Failed to add display");
+        return;
+    }
+
+    if (offset_x != 0 || offset_y != 0) {
+        lv_display_set_offset(display_, offset_x, offset_y);
+    }
+
+    // Update the theme
+    if (current_theme_name_ == "dark") {
+        current_theme = DARK_THEME;
+    } else if (current_theme_name_ == "light") {
+        current_theme = LIGHT_THEME;
+    }
+
+    // SetupUI();
+    auto screen = lv_screen_active();
+    if (screen == nullptr) {
+        ESP_LOGE(TAG, "lv_screen_active() returned null!");
+        return;
+    }
+    
+    lv_obj_set_style_bg_color(screen, lv_color_hex(0x0d1d2f), 0);
+    lv_obj_set_style_border_width(screen, 0, 0);
+    gif_ = lv_gif_create(screen);
+    if (gif_ == nullptr) {
+        ESP_LOGE(TAG, "gif_ returned null!");
+        return;
+    }
+
+    // 初始化为netural
+    lvgl_port_lock(0);
+    lv_gif_set_src(gif_,  &neutral);
+    lv_obj_align(gif_, LV_ALIGN_CENTER, 0, 0);
+
+    lvgl_port_unlock();
+
+}
 
 SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel,
                            int width, int height, int offset_x, int offset_y, bool mirror_x, bool mirror_y, bool swap_xy,
@@ -150,7 +299,17 @@ SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
         current_theme = LIGHT_THEME;
     }
 
-    SetupUI();
+    // SetupUI();
+    auto screen = lv_screen_active();
+    lv_obj_set_style_bg_color(screen, lv_color_hex(0x0e1f32), 0);
+    lv_obj_set_style_border_width(screen, 0, 0);
+    gif_ = lv_gif_create(screen);
+
+    // 初始化为netural
+    lvgl_port_lock(0);
+    lv_gif_set_src(gif_,  &neutral);
+    lv_obj_align(gif_, LV_ALIGN_CENTER, 0, 0);
+    lvgl_port_unlock();
 }
 
 // RGB LCD实现
@@ -637,51 +796,13 @@ void LcdDisplay::SetupUI() {
 #endif
 
 void LcdDisplay::SetEmotion(const char* emotion) {
-    struct Emotion {
-        const char* icon;
-        const char* text;
-    };
-
-    static const std::vector<Emotion> emotions = {
-        {"😶", "neutral"},
-        {"🙂", "happy"},
-        {"😆", "laughing"},
-        {"😂", "funny"},
-        {"😔", "sad"},
-        {"😠", "angry"},
-        {"😭", "crying"},
-        {"😍", "loving"},
-        {"😳", "embarrassed"},
-        {"😯", "surprised"},
-        {"😱", "shocked"},
-        {"🤔", "thinking"},
-        {"😉", "winking"},
-        {"😎", "cool"},
-        {"😌", "relaxed"},
-        {"🤤", "delicious"},
-        {"😘", "kissy"},
-        {"😏", "confident"},
-        {"😴", "sleepy"},
-        {"😜", "silly"},
-        {"🙄", "confused"}
-    };
-    
-    // 查找匹配的表情
-    std::string_view emotion_view(emotion);
-    auto it = std::find_if(emotions.begin(), emotions.end(),
-        [&emotion_view](const Emotion& e) { return e.text == emotion_view; });
-
+    auto it = emotions.find(emotion);
     DisplayLockGuard lock(this);
-    if (emotion_label_ == nullptr) {
-        return;
-    }
-
     // 如果找到匹配的表情就显示对应图标，否则显示默认的neutral表情
-    lv_obj_set_style_text_font(emotion_label_, fonts_.emoji_font, 0);
     if (it != emotions.end()) {
-        lv_label_set_text(emotion_label_, it->icon);
+        lv_gif_set_src(gif_,  it->second);
     } else {
-        lv_label_set_text(emotion_label_, "😶");
+        lv_gif_set_src(gif_,  &neutral);
     }
 }
 

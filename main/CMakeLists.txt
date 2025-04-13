@@ -20,7 +20,7 @@ set(SOURCES "audio_codecs/audio_codec.cc"
             "main.cc"
             )
 
-set(INCLUDE_DIRS "." "display" "audio_codecs" "protocols" "audio_processing")
+set(INCLUDE_DIRS "." "display" "audio_codecs" "protocols" "audio_processing" "emoji")
 
 # 添加 IOT 相关文件
 file(GLOB IOT_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/iot/things/*.cc)
@@ -134,6 +134,8 @@ elseif(CONFIG_BOARD_TYPE_SENSECAP_WATCHER)
     set(BOARD_TYPE "sensecap-watcher")
 elseif(CONFIG_BOARD_TYPE_ESP32_CGC)
     set(BOARD_TYPE "esp32-cgc")
+elseif(CONFIG_YOMI_V1_BOARD)
+    set(BOARD_TYPE "yomi-v1")
 endif()
 file(GLOB BOARD_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/boards/${BOARD_TYPE}/*.cc
@@ -153,6 +155,10 @@ endif()
 if(CONFIG_USE_WAKE_WORD_DETECT)
     list(APPEND SOURCES "audio_processing/wake_word_detect.cc")
 endif()
+
+# 添加emoji目录下的所有.c文件到SOURCES列表中
+file(GLOB EMOJI_HAPPY_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/emoji/*.c)
+list(APPEND SOURCES ${EMOJI_HAPPY_SOURCES})
 
 # 根据Kconfig选择语言目录
 if(CONFIG_LANGUAGE_ZH_CN)
