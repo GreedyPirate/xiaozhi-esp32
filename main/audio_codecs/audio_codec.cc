@@ -34,6 +34,7 @@ void AudioCodec::Start() {
         output_volume_ = 10;
     }
 
+    //启动 I2S 通道数据传输，tx发送，rx接收
     ESP_ERROR_CHECK(i2s_channel_enable(tx_handle_));
     ESP_ERROR_CHECK(i2s_channel_enable(rx_handle_));
 

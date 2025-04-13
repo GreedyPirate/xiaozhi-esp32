@@ -34,6 +34,7 @@ void WakeWordDetect::Initialize(AudioCodec* codec) {
     codec_ = codec;
     int ref_num = codec_->input_reference() ? 1 : 0;
 
+    // 加载esp-s3本地语音唤醒词识别模型，唤醒词是训练时固定的
     srmodel_list_t *models = esp_srmodel_init("model");
     for (int i = 0; i < models->num; i++) {
         ESP_LOGI(TAG, "Model %d: %s", i, models->model_name[i]);

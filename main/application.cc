@@ -313,8 +313,13 @@ void Application::Start() {
 
     /* Setup the audio codec */
     auto codec = board.GetAudioCodec();
-    opus_decoder_ = std::make_unique<OpusDecoderWrapper>(codec->output_sample_rate(), 1, OPUS_FRAME_DURATION_MS);
-    opus_encoder_ = std::make_unique<OpusEncoderWrapper>(16000, 1, OPUS_FRAME_DURATION_MS);
+    /*
+        opus_decoder_：生成的压缩音频数据还原为原始的PCM格式音频数据。使音频播放设备（如扬声器或耳机）能够播放
+        opus_encoder_：将未压缩音频数据（如来自麦克风或音频文件的PCM格式数据）转换成压缩格式的数据流
+    */
+    opus_decoder_ = std::make_unique<OpusDecoderWrapper>(codec->output_sample_rate(), 1, OPUS_FRAME_DURATION_MS); // 解码后喇叭播放
+    opus_encoder_ = std::make_unique<OpusEncoderWrapper>(16000, 1, OPUS_FRAME_DURATION_MS); // 编码麦克风输入
+    // SetComplexity 值越高，音质越高，cpu消耗越高
     if (realtime_chat_enabled_) {
         ESP_LOGI(TAG, "Realtime chat enabled, setting opus encoder complexity to 0");
         opus_encoder_->SetComplexity(0);

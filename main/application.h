@@ -109,6 +109,8 @@ private:
     std::unique_ptr<OpusEncoderWrapper> opus_encoder_;
     std::unique_ptr<OpusDecoderWrapper> opus_decoder_;
 
+    // 采样率（Sampling Rate）：单位时间内对信号采集的次数，采样率越高，信号细节保留越多，但数据量也越大
+    // 重采样就是采样率对齐，reference_resampler让输入和消除回声的频率一致
     OpusResampler input_resampler_;
     OpusResampler reference_resampler_;
     OpusResampler output_resampler_;
